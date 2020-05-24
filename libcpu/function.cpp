@@ -131,22 +131,22 @@ emit_decode_fp_reg_helper(cpu_t *cpu, uint32_t count, uint32_t width,
 			snprintf(reg_name, sizeof(reg_name), "fpr_%u_0", i);
 
 			in_ptr_r[i*2+0] = get_struct_member_pointer(cpu, cpu->ptr_frf, i*2+0, bb);
-			ptr_r[i*2+0] = new AllocaInst(getIntegerType(64), 0, 0, 0, reg_name, bb);
-			LoadInst* v = new LoadInst(in_ptr_r[i*2+0], "", false, 0, bb);
-			new StoreInst(v, ptr_r[i*2+0], false, 0, bb);
+			ptr_r[i*2+0] = new AllocaInst(getIntegerType(64), 0, 0, MaybeAlign(), reg_name, bb);
+			LoadInst* v = new LoadInst(in_ptr_r[i*2+0], "", false, MaybeAlign(), bb);
+			new StoreInst(v, ptr_r[i*2+0], false, MaybeAlign(), bb);
 
 			snprintf(reg_name, sizeof(reg_name), "fpr_%u_1", i);
 
 			in_ptr_r[i*2+1] = get_struct_member_pointer(cpu, cpu->ptr_frf, i*2+1, bb);
-			ptr_r[i*2+1] = new AllocaInst(getIntegerType(64), 0, 0, 0, reg_name, bb);
-			v = new LoadInst(in_ptr_r[i*2+1], "", false, 0, bb);
-			new StoreInst(v, ptr_r[i*2+1], false, 0, bb);
+			ptr_r[i*2+1] = new AllocaInst(getIntegerType(64), 0, 0, MaybeAlign(), reg_name, bb);
+			v = new LoadInst(in_ptr_r[i*2+1], "", false, MaybeAlign(), bb);
+			new StoreInst(v, ptr_r[i*2+1], false, MaybeAlign(), bb);
 		} else {
 			snprintf(reg_name, sizeof(reg_name), "fpr_%u", i);
 			in_ptr_r[i] = get_struct_member_pointer(cpu, cpu->ptr_frf, i, bb);
-			ptr_r[i] = new AllocaInst(getFloatType(width), 0, 0, fp_alignment(width), reg_name, bb);
-			LoadInst* v = new LoadInst(in_ptr_r[i], "", false, fp_alignment(width), bb);
-			new StoreInst(v, ptr_r[i], false, fp_alignment(width), bb);
+			ptr_r[i] = new AllocaInst(getFloatType(width), 0, 0, Align(fp_alignment(width)), reg_name, bb);
+			LoadInst* v = new LoadInst(in_ptr_r[i], "", false, Align(fp_alignment(width)), bb);
+			new StoreInst(v, ptr_r[i], false, Align(fp_alignment(width)), bb);
 		}
 	}
 #else
@@ -236,15 +236,15 @@ spill_fp_reg_state_helper(cpu_t *cpu, uint32_t count, uint32_t width,
 	for (uint32_t i = 0; i < count; i++) {
 		if ((width == 80 && (cpu->flags & CPU_FLAG_FP80) == 0) ||
 			(width == 128 && (cpu->flags & CPU_FLAG_FP128) == 0)) {
-			LoadInst* v = new LoadInst(ptr_r[i*2+0], "", false, 0, bb);
-			new StoreInst(v, in_ptr_r[i*2+0], false, 0, bb);
+			LoadInst* v = new LoadInst(ptr_r[i*2+0], "", false, MaybeAlign(), bb);
+			new StoreInst(v, in_ptr_r[i*2+0], false, MaybeAlign(), bb);
 
-			v = new LoadInst(ptr_r[i*2+1], "", false, 0, bb);
-			new StoreInst(v, in_ptr_r[i*2+1], false, 0, bb);
+			v = new LoadInst(ptr_r[i*2+1], "", false, MaybeAlign(), bb);
+			new StoreInst(v, in_ptr_r[i*2+1], false, MaybeAlign(), bb);
 		} else {
 			LoadInst* v = new LoadInst(ptr_r[i], "", false,
-				fp_alignment(width), bb);
-			new StoreInst(v, in_ptr_r[i], false, fp_alignment(width), bb);
+				Align(fp_alignment(width)), bb);
+			new StoreInst(v, in_ptr_r[i], false, Align(fp_alignment(width)), bb);
 		}
 	}
 #endif
@@ -347,7 +347,7 @@ cpu_create_function(cpu_t *cpu, const char *name,
 	// assume JIT_RETURN_FUNCNOTFOUND or JIT_RETURN_SINGLESTEP if in in single step.
 	new StoreInst(ConstantInt::get(XgetType(Int32Ty),
 					(cpu->flags_debug & (CPU_DEBUG_SINGLESTEP | CPU_DEBUG_SINGLESTEP_BB)) ? JIT_RETURN_SINGLESTEP :
-					JIT_RETURN_FUNCNOTFOUND), exit_code, false, 0, label_entry);
+					JIT_RETURN_FUNCNOTFOUND), exit_code, false, MaybeAlign(), label_entry);
 
 #if 0 // bad for debugging, minimal speedup
 	/* make the RAM pointer a constant */
@@ -358,10 +358,10 @@ cpu_create_function(cpu_t *cpu, const char *name,
 	// create ret basicblock
 	BasicBlock *bb_ret = BasicBlock::Create(_CTX(), "ret", func, 0);  
 	spill_reg_state(cpu, bb_ret);
-	ReturnInst::Create(_CTX(), new LoadInst(exit_code, "", false, 0, bb_ret), bb_ret);
+	ReturnInst::Create(_CTX(), new LoadInst(exit_code, "", false, MaybeAlign(), bb_ret), bb_ret);
 	// create trap return basicblock
 	BasicBlock *bb_trap = BasicBlock::Create(_CTX(), "trap", func, 0);  
-	new StoreInst(ConstantInt::get(XgetType(Int32Ty), JIT_RETURN_TRAP), exit_code, false, 0, bb_trap);
+	new StoreInst(ConstantInt::get(XgetType(Int32Ty), JIT_RETURN_TRAP), exit_code, false, MaybeAlign(), bb_trap);
 	// return
 	BranchInst::Create(bb_ret, bb_trap);
 
